@@ -1,6 +1,6 @@
 {
-  "name": "web-temp",
-  "version": "0.0.0",
+  "name": "form-assistant-web",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
