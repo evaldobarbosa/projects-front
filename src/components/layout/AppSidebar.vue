@@ -1,90 +1,104 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
-const authStore = useAuthStore()
 
 interface NavItem {
   name: string
   path: string
   icon: string
-  iconFilled?: boolean
+  label: string
 }
 
 const navItems: NavItem[] = [
-  { name: 'Dashboard', path: '/', icon: 'dashboard' },
-  { name: 'Projetos', path: '/projects', icon: 'assignment' },
-  { name: 'Contratos', path: '/contracts', icon: 'contract' },
-  { name: 'Usuários', path: '/users', icon: 'group' },
-  { name: 'Configurações', path: '/settings', icon: 'settings' },
+  { name: 'Dashboard', path: '/dashboard', icon: 'dashboard', label: 'Dashboard' },
+  { name: 'Projects', path: '/projects', icon: 'assignment', label: 'Projetos' },
+  { name: 'Users', path: '/users', icon: 'group', label: 'Usuários' },
+  { name: 'Contracts', path: '/contracts', icon: 'description', label: 'Contratos' },
+  { name: 'Settings', path: '/settings', icon: 'settings', label: 'Configurações' },
+]
+
+const supportLinks: NavItem[] = [
+  { name: 'Help', path: '/help', icon: 'help', label: 'Central de Ajuda' },
+  { name: 'Support', path: '/support', icon: 'contact_support', label: 'Suporte' },
 ]
 
 const isActive = (path: string) => {
-  if (path === '/') {
-    return route.path === '/'
+  if (path === '/dashboard') {
+    return route.path === '/dashboard' || route.path === '/'
   }
   return route.path.startsWith(path)
+}
+
+const getIconStyle = (path: string) => {
+  return isActive(path) ? "font-variation-settings: 'FILL' 1;" : ''
 }
 </script>
 
 <template>
-  <aside class="fixed left-0 top-0 h-full w-64 bg-card border-r border-border flex flex-col p-4 gap-2 z-50">
-    <!-- Logo -->
-    <div class="flex items-center gap-2 mb-6 px-1">
-      <div class="w-10 h-10 bg-primary rounded-lg flex items-center justify-center text-primary-foreground">
-        <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">description</span>
+  <aside class="fixed left-0 top-0 h-full w-[280px] bg-surface border-r border-outline-variant flex flex-col p-md gap-sm z-50">
+    <!-- Brand Section -->
+    <div class="flex items-center gap-sm mb-lg px-xs">
+      <div class="w-10 h-10 bg-primary rounded-lg flex items-center justify-center text-on-primary">
+        <span class="material-symbols-outlined">architecture</span>
       </div>
       <div>
-        <h1 class="text-xl font-semibold text-foreground">FormAssistant</h1>
-        <p class="text-xs text-muted-foreground">Enterprise Survey Tool</p>
+        <h1 class="font-h3 text-h3 text-on-surface leading-none">FormAssistant</h1>
+        <p class="text-[10px] text-on-surface-variant uppercase tracking-widest font-bold">
+          Enterprise Survey Tool
+        </p>
       </div>
     </div>
 
-    <!-- Navigation -->
+    <!-- Navigation Links -->
     <nav class="flex-1 space-y-1">
       <RouterLink
         v-for="item in navItems"
         :key="item.path"
         :to="item.path"
-        class="flex items-center gap-4 px-4 py-2 rounded-lg transition-all duration-200 group"
+        class="flex items-center gap-md px-md py-sm rounded-lg transition-all duration-200 ease-in-out font-label-md text-label-md"
         :class="isActive(item.path)
-          ? 'bg-secondary text-secondary-foreground'
-          : 'text-muted-foreground hover:bg-muted hover:text-foreground'"
+          ? 'bg-secondary-container text-on-secondary-container'
+          : 'text-on-surface-variant hover:bg-surface-container-high'"
       >
         <span
           class="material-symbols-outlined"
-          :style="isActive(item.path) ? `font-variation-settings: 'FILL' 1;` : ''"
-          :class="isActive(item.path) ? '' : 'group-hover:text-primary'"
+          :style="getIconStyle(item.path)"
         >
           {{ item.icon }}
         </span>
-        <span class="text-sm font-medium">{{ item.name }}</span>
+        <span>{{ item.label }}</span>
       </RouterLink>
     </nav>
 
-    <!-- Bottom Section -->
-    <div class="mt-auto pt-4 border-t border-border space-y-1">
-      <button class="w-full mb-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
-        Criar Novo Formulário
+    <!-- Support Section -->
+    <div class="mt-auto space-y-1 pb-md">
+      <a
+        v-for="link in supportLinks"
+        :key="link.path"
+        href="#"
+        class="flex items-center gap-md px-md py-sm text-on-surface-variant hover:bg-surface-container-high rounded-lg transition-all duration-200 ease-in-out font-label-md text-label-md"
+      >
+        <span class="material-symbols-outlined">{{ link.icon }}</span>
+        <span>{{ link.label }}</span>
+      </a>
+    </div>
+
+    <!-- User Profile Dropdown (Footer) -->
+    <div class="border-t border-outline-variant pt-md px-xs">
+      <button class="w-full flex items-center gap-md p-sm hover:bg-surface-container-high rounded-xl transition-colors text-left">
+        <img
+          alt="User profile photo"
+          class="w-10 h-10 rounded-full object-cover border border-outline-variant shadow-sm"
+          src="https://via.placeholder.com/40"
+        />
+        <div class="flex-1 min-w-0">
+          <p class="font-label-md text-label-md text-on-surface truncate">Admin User</p>
+          <p class="font-label-sm text-label-sm text-on-surface-variant truncate">Administrator</p>
+        </div>
+        <span class="material-symbols-outlined text-outline">unfold_more</span>
       </button>
-
-      <a
-        href="#"
-        class="flex items-center gap-4 px-4 py-2 text-muted-foreground hover:bg-muted hover:text-foreground rounded-lg transition-all duration-200"
-      >
-        <span class="material-symbols-outlined">help</span>
-        <span class="text-sm font-medium">Central de Ajuda</span>
-      </a>
-
-      <a
-        href="#"
-        class="flex items-center gap-4 px-4 py-2 text-muted-foreground hover:bg-muted hover:text-foreground rounded-lg transition-all duration-200"
-      >
-        <span class="material-symbols-outlined">contact_support</span>
-        <span class="text-sm font-medium">Suporte</span>
-      </a>
     </div>
   </aside>
 </template>

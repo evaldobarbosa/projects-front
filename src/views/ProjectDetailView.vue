@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { api, type Project } from '@/lib/api'
+import { api, type Project, type Questionnaire } from '@/lib/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -10,10 +10,37 @@ const route = useRoute()
 const router = useRouter()
 
 const project = ref<Project | null>(null)
+const questionnaires = ref<Questionnaire[]>([])
 const isLoading = ref(true)
 const error = ref<string | null>(null)
 
 const projectId = computed(() => Number(route.params.id))
+
+const totalResponses = computed(() => {
+  return questionnaires.value.reduce((acc, q: any) => acc + (q.responses_count || 0), 0)
+})
+
+function getQuestionnaireStatusBadge(status: string) {
+  const badges: Record<string, string> = {
+    draft: 'bg-muted text-muted-foreground',
+    published: 'bg-success/10 text-success',
+    archived: 'bg-secondary/10 text-secondary',
+  }
+  return badges[status] || 'bg-muted text-muted-foreground'
+}
+
+function getQuestionnaireStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    draft: 'Rascunho',
+    published: 'Publicado',
+    archived: 'Arquivado',
+  }
+  return labels[status] || status
+}
+
+function handleCreateQuestionnaire() {
+  router.push(`/questionnaires/new?project_id=${projectId.value}`)
+}
 
 async function loadProject() {
   isLoading.value = true
@@ -22,6 +49,13 @@ async function loadProject() {
   try {
     const response = await api.getProject(projectId.value)
     project.value = response.project
+
+    // Load questionnaires
+    const questionnairesResponse = await api.getQuestionnaires({
+      project_id: projectId.value,
+      per_page: 100,
+    })
+    questionnaires.value = questionnairesResponse.questionnaires.data
   } catch (err) {
     error.value = 'Erro ao carregar projeto.'
     console.error(err)
@@ -125,173 +159,174 @@ onMounted(() => {
 
     <!-- Project Details -->
     <template v-else-if="project">
-      <!-- Header -->
-      <div class="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-8">
-        <div class="flex items-start gap-4">
+      <!-- Actions Bar -->
+      <div class="flex justify-between items-center mb-6">
+        <div class="flex items-center gap-2">
           <button
-            class="p-2 hover:bg-muted rounded-lg text-muted-foreground transition-colors"
+            class="p-1.5 hover:bg-muted rounded-lg text-muted-foreground transition-colors"
             @click="router.push('/projects')"
           >
-            <span class="material-symbols-outlined">arrow_back</span>
+            <span class="material-symbols-outlined text-[20px]">arrow_back</span>
           </button>
-          <div>
-            <div class="flex items-center gap-3 mb-2">
-              <h1 class="text-3xl font-bold text-foreground">{{ project.name }}</h1>
-              <span
-                class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"
-                :class="getStatusBadgeClass(project.status)"
-              >
-                {{ getStatusLabel(project.status) }}
-              </span>
-            </div>
-            <p class="text-muted-foreground">{{ project.description || 'Sem descrição' }}</p>
-          </div>
+          <span
+            class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+            :class="getStatusBadgeClass(project.status)"
+          >
+            {{ getStatusLabel(project.status) }}
+          </span>
         </div>
-        <div class="flex gap-3">
-          <Button variant="outline" @click="deleteProject">
-            <span class="material-symbols-outlined text-[18px] mr-2">delete</span>
+        <div class="flex gap-2">
+          <Button variant="outline" size="sm" @click="deleteProject">
+            <span class="material-symbols-outlined text-[16px] mr-1.5">delete</span>
             Excluir
           </Button>
           <RouterLink :to="`/projects/${project.id}/edit`">
-            <Button variant="outline">
-              <span class="material-symbols-outlined text-[18px] mr-2">edit</span>
+            <Button variant="outline" size="sm">
+              <span class="material-symbols-outlined text-[16px] mr-1.5">edit</span>
               Editar
             </Button>
           </RouterLink>
-          <Button v-if="project.status === 'draft'">
-            <span class="material-symbols-outlined text-[18px] mr-2">play_arrow</span>
+          <Button v-if="project.status === 'draft'" size="sm">
+            <span class="material-symbols-outlined text-[16px] mr-1.5">play_arrow</span>
             Iniciar Coleta
           </Button>
         </div>
       </div>
 
-      <!-- Stats Cards -->
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <Card class="border-border">
-          <CardContent class="p-6">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Questionários</span>
-              <div class="w-8 h-8 bg-primary/10 text-primary rounded-lg flex items-center justify-center">
-                <span class="material-symbols-outlined text-[20px]">description</span>
-              </div>
-            </div>
-            <div class="text-3xl font-bold text-foreground">0</div>
-            <div class="text-muted-foreground text-sm mt-1">formulários criados</div>
-          </CardContent>
-        </Card>
-
-        <Card class="border-border">
-          <CardContent class="p-6">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Respostas</span>
-              <div class="w-8 h-8 bg-success/10 text-success rounded-lg flex items-center justify-center">
-                <span class="material-symbols-outlined text-[20px]">inbox</span>
-              </div>
-            </div>
-            <div class="text-3xl font-bold text-foreground">0</div>
-            <div class="text-muted-foreground text-sm mt-1">coletadas</div>
-          </CardContent>
-        </Card>
-
-        <Card class="border-border">
-          <CardContent class="p-6">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Equipe</span>
-              <div class="w-8 h-8 bg-warning/10 text-warning rounded-lg flex items-center justify-center">
-                <span class="material-symbols-outlined text-[20px]">group</span>
-              </div>
-            </div>
-            <div class="text-3xl font-bold text-foreground">1</div>
-            <div class="text-muted-foreground text-sm mt-1">membros</div>
-          </CardContent>
-        </Card>
-
-        <Card class="border-border">
-          <CardContent class="p-6">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Contratos</span>
-              <div class="w-8 h-8 bg-secondary text-secondary-foreground rounded-lg flex items-center justify-center">
-                <span class="material-symbols-outlined text-[20px]">contract</span>
-              </div>
-            </div>
-            <div class="text-3xl font-bold text-foreground">{{ project.contracts?.length || 0 }}</div>
-            <div class="text-muted-foreground text-sm mt-1">vinculados</div>
-          </CardContent>
-        </Card>
-      </div>
-
       <!-- Main Content Grid -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <!-- Left Column: Info + Contracts -->
-        <div class="lg:col-span-2 space-y-6">
+        <div class="lg:col-span-2 space-y-5">
           <!-- Project Info -->
           <Card class="border-border">
-            <CardHeader>
-              <CardTitle>Informações do Projeto</CardTitle>
+            <CardHeader class="pb-3">
+              <CardTitle class="text-base">Informações do Projeto</CardTitle>
             </CardHeader>
-            <CardContent>
-              <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CardContent class="pt-0">
+              <dl class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div>
-                  <dt class="text-sm font-medium text-muted-foreground">Responsável</dt>
-                  <dd class="mt-1 text-foreground flex items-center gap-2">
-                    <div class="w-8 h-8 bg-primary/10 text-primary rounded-full flex items-center justify-center">
-                      <span class="text-sm font-medium">{{ project.owner?.name?.charAt(0) || '?' }}</span>
+                  <dt class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">Responsável</dt>
+                  <dd class="text-foreground flex items-center gap-2">
+                    <div class="w-7 h-7 bg-primary/10 text-primary rounded-full flex items-center justify-center flex-shrink-0">
+                      <span class="text-xs font-medium">{{ project.owner?.name?.charAt(0) || '?' }}</span>
                     </div>
-                    {{ project.owner?.name || '—' }}
+                    <span class="truncate">{{ project.owner?.name || '—' }}</span>
                   </dd>
                 </div>
                 <div>
-                  <dt class="text-sm font-medium text-muted-foreground">Criado em</dt>
-                  <dd class="mt-1 text-foreground">{{ formatDate(project.created_at) }}</dd>
+                  <dt class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">Criado em</dt>
+                  <dd class="text-foreground">{{ formatDate(project.created_at) }}</dd>
                 </div>
                 <div>
-                  <dt class="text-sm font-medium text-muted-foreground">Data de Início</dt>
-                  <dd class="mt-1 text-foreground">{{ formatDate(project.start_date) }}</dd>
+                  <dt class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">Data de Início</dt>
+                  <dd class="text-foreground">{{ formatDate(project.start_date) }}</dd>
                 </div>
                 <div>
-                  <dt class="text-sm font-medium text-muted-foreground">Data de Término</dt>
-                  <dd class="mt-1 text-foreground">{{ formatDate(project.end_date) }}</dd>
+                  <dt class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">Data de Término</dt>
+                  <dd class="text-foreground">{{ formatDate(project.end_date) }}</dd>
                 </div>
               </dl>
             </CardContent>
           </Card>
 
-          <!-- Contracts -->
+          <!-- Questionnaires -->
           <Card class="border-border">
-            <CardHeader>
+            <CardHeader class="pb-3">
               <div class="flex items-center justify-between">
-                <CardTitle>Contratos Vinculados</CardTitle>
-                <Button variant="outline" size="sm">
+                <div>
+                  <CardTitle class="text-base">Questionários</CardTitle>
+                  <CardDescription class="mt-1 text-xs">
+                    {{ questionnaires.length }} {{ questionnaires.length === 1 ? 'questionário' : 'questionários' }}
+                    • {{ totalResponses }} {{ totalResponses === 1 ? 'resposta' : 'respostas' }}
+                  </CardDescription>
+                </div>
+                <Button size="sm" @click="handleCreateQuestionnaire">
                   <span class="material-symbols-outlined text-[16px] mr-1">add</span>
-                  Vincular Contrato
+                  Novo
                 </Button>
               </div>
             </CardHeader>
-            <CardContent>
-              <div v-if="project.contracts && project.contracts.length > 0" class="space-y-3">
+            <CardContent class="pt-0">
+              <div v-if="questionnaires.length > 0" class="space-y-2">
+                <div
+                  v-for="questionnaire in questionnaires"
+                  :key="questionnaire.id"
+                  class="flex items-center justify-between p-3 bg-muted/30 rounded-md hover:bg-muted/50 transition-colors cursor-pointer border border-transparent hover:border-border"
+                  @click="router.push(`/questionnaires/${questionnaire.id}/builder`)"
+                >
+                  <div class="flex items-center gap-3 flex-1 min-w-0">
+                    <div class="w-9 h-9 bg-primary/10 text-primary rounded-lg flex items-center justify-center flex-shrink-0">
+                      <span class="material-symbols-outlined text-[18px]">description</span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <div class="font-medium text-sm text-foreground truncate">{{ questionnaire.title }}</div>
+                      <div class="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
+                        <span>{{ questionnaire.versions_count || 0 }} {{ questionnaire.versions_count === 1 ? 'versão' : 'versões' }}</span>
+                        <span>•</span>
+                        <span>{{ (questionnaire as any).responses_count || 0 }} {{ (questionnaire as any).responses_count === 1 ? 'resposta' : 'respostas' }}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span
+                      class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wide"
+                      :class="getQuestionnaireStatusBadge(questionnaire.status)"
+                    >
+                      {{ getQuestionnaireStatusLabel(questionnaire.status) }}
+                    </span>
+                    <span class="material-symbols-outlined text-[18px] text-muted-foreground">chevron_right</span>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="text-center py-6">
+                <div class="w-10 h-10 bg-muted rounded-full flex items-center justify-center mx-auto mb-2">
+                  <span class="material-symbols-outlined text-muted-foreground text-[20px]">description</span>
+                </div>
+                <p class="text-sm text-muted-foreground mb-3">Nenhum questionário criado</p>
+                <Button variant="outline" size="sm" @click="handleCreateQuestionnaire">
+                  <span class="material-symbols-outlined text-[16px] mr-1">add</span>
+                  Criar Primeiro Questionário
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <!-- Contracts -->
+          <Card class="border-border">
+            <CardHeader class="pb-3">
+              <div class="flex items-center justify-between">
+                <CardTitle class="text-base">Contratos Vinculados</CardTitle>
+                <Button variant="outline" size="sm">
+                  <span class="material-symbols-outlined text-[16px] mr-1">add</span>
+                  Vincular
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent class="pt-0">
+              <div v-if="project.contracts && project.contracts.length > 0" class="space-y-2">
                 <div
                   v-for="contract in project.contracts"
                   :key="contract.id"
-                  class="flex items-center justify-between p-4 bg-muted/50 rounded-lg"
+                  class="flex items-center justify-between p-3 bg-muted/30 rounded-md"
                 >
-                  <div class="flex items-center gap-4">
-                    <div class="w-10 h-10 bg-secondary rounded-lg flex items-center justify-center">
-                      <span class="material-symbols-outlined text-secondary-foreground">contract</span>
+                  <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 bg-secondary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <span class="material-symbols-outlined text-[18px] text-secondary">contract</span>
                     </div>
                     <div>
-                      <div class="font-medium text-foreground">{{ contract.code }}</div>
-                      <div class="text-sm text-muted-foreground">{{ contract.name }}</div>
+                      <div class="font-medium text-sm text-foreground">{{ contract.code }}</div>
+                      <div class="text-xs text-muted-foreground">{{ contract.name }}</div>
                     </div>
                   </div>
-                  <div class="flex items-center gap-4">
+                  <div class="flex items-center gap-3">
                     <div class="text-right">
-                      <div class="font-medium text-foreground">{{ formatCurrency(contract.value) }}</div>
-                      <div class="text-xs text-muted-foreground">
+                      <div class="font-medium text-sm text-foreground">{{ formatCurrency(contract.value) }}</div>
+                      <div class="text-[10px] text-muted-foreground">
                         {{ formatDate(contract.start_date) }} - {{ formatDate(contract.end_date) }}
                       </div>
                     </div>
                     <span
-                      class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                      class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wide"
                       :class="getContractStatusClass(contract.status || '')"
                     >
                       {{ getContractStatusLabel(contract.status || '') }}
@@ -299,11 +334,11 @@ onMounted(() => {
                   </div>
                 </div>
               </div>
-              <div v-else class="text-center py-8">
-                <div class="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
-                  <span class="material-symbols-outlined text-muted-foreground">contract</span>
+              <div v-else class="text-center py-6">
+                <div class="w-10 h-10 bg-muted rounded-full flex items-center justify-center mx-auto mb-2">
+                  <span class="material-symbols-outlined text-[20px] text-muted-foreground">contract</span>
                 </div>
-                <p class="text-muted-foreground mb-4">Nenhum contrato vinculado</p>
+                <p class="text-sm text-muted-foreground mb-3">Nenhum contrato vinculado</p>
                 <Button variant="outline" size="sm">
                   <span class="material-symbols-outlined text-[16px] mr-1">add</span>
                   Vincular Contrato
@@ -314,27 +349,19 @@ onMounted(() => {
         </div>
 
         <!-- Right Column: Sidebar -->
-        <div class="space-y-6">
+        <div class="space-y-5">
           <!-- Quick Actions -->
           <Card class="border-border">
-            <CardHeader>
-              <CardTitle>Ações Rápidas</CardTitle>
+            <CardHeader class="pb-3">
+              <CardTitle class="text-base">Ações Rápidas</CardTitle>
             </CardHeader>
-            <CardContent class="space-y-2">
-              <Button variant="outline" class="w-full justify-start">
-                <span class="material-symbols-outlined text-[18px] mr-3">add</span>
-                Criar Questionário
-              </Button>
-              <Button variant="outline" class="w-full justify-start">
-                <span class="material-symbols-outlined text-[18px] mr-3">person_add</span>
-                Adicionar Membro
-              </Button>
-              <Button variant="outline" class="w-full justify-start">
-                <span class="material-symbols-outlined text-[18px] mr-3">analytics</span>
+            <CardContent class="space-y-1.5 pt-0">
+              <Button variant="outline" size="sm" class="w-full justify-start text-sm">
+                <span class="material-symbols-outlined text-[16px] mr-2">analytics</span>
                 Ver Relatórios
               </Button>
-              <Button variant="outline" class="w-full justify-start">
-                <span class="material-symbols-outlined text-[18px] mr-3">download</span>
+              <Button variant="outline" size="sm" class="w-full justify-start text-sm">
+                <span class="material-symbols-outlined text-[16px] mr-2">download</span>
                 Exportar Dados
               </Button>
             </CardContent>
@@ -342,25 +369,25 @@ onMounted(() => {
 
           <!-- Team -->
           <Card class="border-border">
-            <CardHeader>
+            <CardHeader class="pb-3">
               <div class="flex items-center justify-between">
-                <CardTitle>Equipe</CardTitle>
+                <CardTitle class="text-base">Equipe</CardTitle>
                 <Button variant="ghost" size="sm">
                   <span class="material-symbols-outlined text-[16px]">add</span>
                 </Button>
               </div>
             </CardHeader>
-            <CardContent>
-              <div class="space-y-3">
-                <div class="flex items-center gap-3">
-                  <div class="w-10 h-10 bg-primary/10 text-primary rounded-full flex items-center justify-center">
-                    <span class="text-sm font-medium">{{ project.owner?.name?.charAt(0) || '?' }}</span>
+            <CardContent class="pt-0">
+              <div class="space-y-2">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-8 h-8 bg-primary/10 text-primary rounded-full flex items-center justify-center flex-shrink-0">
+                    <span class="text-xs font-medium">{{ project.owner?.name?.charAt(0) || '?' }}</span>
                   </div>
-                  <div class="flex-1">
-                    <div class="font-medium text-foreground">{{ project.owner?.name }}</div>
-                    <div class="text-xs text-muted-foreground">{{ project.owner?.email }}</div>
+                  <div class="flex-1 min-w-0">
+                    <div class="font-medium text-sm text-foreground truncate">{{ project.owner?.name }}</div>
+                    <div class="text-xs text-muted-foreground truncate">{{ project.owner?.email }}</div>
                   </div>
-                  <span class="text-xs text-primary font-medium">Responsável</span>
+                  <span class="text-[10px] text-primary font-medium uppercase tracking-wide">Admin</span>
                 </div>
               </div>
             </CardContent>
@@ -368,13 +395,13 @@ onMounted(() => {
 
           <!-- Activity -->
           <Card class="border-border">
-            <CardHeader>
-              <CardTitle>Atividade Recente</CardTitle>
+            <CardHeader class="pb-3">
+              <CardTitle class="text-base">Atividade Recente</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div class="text-center py-6">
-                <span class="material-symbols-outlined text-muted-foreground text-[32px]">history</span>
-                <p class="text-sm text-muted-foreground mt-2">Nenhuma atividade recente</p>
+            <CardContent class="pt-0">
+              <div class="text-center py-5">
+                <span class="material-symbols-outlined text-muted-foreground text-[24px]">history</span>
+                <p class="text-xs text-muted-foreground mt-1.5">Nenhuma atividade recente</p>
               </div>
             </CardContent>
           </Card>

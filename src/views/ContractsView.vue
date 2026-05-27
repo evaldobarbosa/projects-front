@@ -1,392 +1,114 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
-import { api, type Contract, type ContractStats, type ContractFilters } from '@/lib/api'
-import { Card, CardContent } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-
-const contracts = ref<Contract[]>([])
-const stats = ref<ContractStats>({
-  total_active: 0,
-  total_value: 0,
-  total_pending: 0,
-  expiring_soon: 0,
-})
-const pagination = ref({
-  current_page: 1,
-  last_page: 1,
-  per_page: 10,
-  total: 0,
-})
-const isLoading = ref(false)
-const error = ref<string | null>(null)
-
-const filters = ref<ContractFilters>({
-  search: '',
-  status: '',
-  client: '',
-  page: 1,
-})
-
-async function loadContracts() {
-  isLoading.value = true
-  error.value = null
-
-  try {
-    const response = await api.getContracts(filters.value)
-    contracts.value = response.contracts.data
-    stats.value = response.stats
-    pagination.value = {
-      current_page: response.contracts.current_page,
-      last_page: response.contracts.last_page,
-      per_page: response.contracts.per_page,
-      total: response.contracts.total,
-    }
-  } catch (err) {
-    error.value = 'Erro ao carregar contratos.'
-    console.error(err)
-  } finally {
-    isLoading.value = false
-  }
-}
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  }).format(value)
-}
-
-function formatDate(dateStr: string): string {
-  const date = new Date(dateStr)
-  return date.toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  })
-}
-
-function getStatusBadgeClass(status: string): string {
-  const classes: Record<string, string> = {
-    active: 'bg-success/10 text-success',
-    pending: 'bg-warning/10 text-warning',
-    expired: 'bg-muted text-muted-foreground',
-    draft: 'bg-primary/10 text-primary',
-    cancelled: 'bg-destructive/10 text-destructive',
-  }
-  return classes[status] || 'bg-muted text-muted-foreground'
-}
-
-function getStatusLabel(status: string): string {
-  const labels: Record<string, string> = {
-    active: 'Ativo',
-    pending: 'Pendente',
-    expired: 'Expirado',
-    draft: 'Rascunho',
-    cancelled: 'Cancelado',
-  }
-  return labels[status] || status
-}
-
-function applyFilters() {
-  filters.value.page = 1
-  loadContracts()
-}
-
-function clearFilters() {
-  filters.value = {
-    search: '',
-    status: '',
-    client: '',
-    page: 1,
-  }
-  loadContracts()
-}
-
-function goToPage(page: number) {
-  if (page >= 1 && page <= pagination.value.last_page) {
-    filters.value.page = page
-    loadContracts()
-  }
-}
-
-const paginationPages = computed(() => {
-  const pages: (number | string)[] = []
-  const current = pagination.value.current_page
-  const last = pagination.value.last_page
-
-  if (last <= 5) {
-    for (let i = 1; i <= last; i++) pages.push(i)
-  } else {
-    pages.push(1)
-    if (current > 3) pages.push('...')
-    for (let i = Math.max(2, current - 1); i <= Math.min(last - 1, current + 1); i++) {
-      pages.push(i)
-    }
-    if (current < last - 2) pages.push('...')
-    pages.push(last)
-  }
-
-  return pages
-})
-
-onMounted(() => {
-  loadContracts()
-})
+// Contracts View - baseado no mockup Stitch
 </script>
 
 <template>
-  <div>
-    <!-- Header -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-      <div>
-        <h1 class="text-3xl font-bold text-foreground">Contratos</h1>
-        <p class="mt-1 text-muted-foreground">Gerencie seus acordos comerciais e termos de serviço.</p>
-      </div>
-      <div class="flex gap-3">
-        <Button variant="outline">
-          <span class="mr-2">↓</span>
-          Exportar CSV
-        </Button>
-        <Button>
-          <span class="mr-2">+</span>
-          Novo Contrato
-        </Button>
-      </div>
-    </div>
+  <div class="space-y-lg">
+    <!-- Filter & CTA Card -->
+    <section class="bg-surface-container-lowest border border-outline-variant rounded-xl p-md flex flex-wrap items-center justify-between gap-md shadow-sm">
+      <div class="flex flex-wrap items-center gap-md flex-1">
+        <!-- Search Input -->
+        <div class="relative min-w-[300px] flex-1 max-w-md">
+          <span class="material-symbols-outlined absolute left-md top-1/2 -translate-y-1/2 text-outline text-[20px]">search</span>
+          <input
+            class="w-full pl-xl pr-md py-sm bg-surface-container-low border-outline-variant border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-body-sm transition-all outline-none"
+            placeholder="Buscar contratos..."
+            type="text"
+          />
+        </div>
 
-    <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-      <Card class="border-border">
-        <CardContent class="p-6">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Ativos</span>
-            <div class="w-8 h-8 bg-success/10 text-success rounded-lg flex items-center justify-center">
-              ✓
-            </div>
-          </div>
-          <div class="text-3xl font-bold text-foreground">{{ stats.total_active }}</div>
-          <div class="flex items-center gap-1 text-success text-sm mt-1">
-            <span>↑</span>
-            <span>contratos vigentes</span>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card class="border-border">
-        <CardContent class="p-6">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Valor em Vigor</span>
-            <div class="w-8 h-8 bg-primary/10 text-primary rounded-lg flex items-center justify-center">
-              $
-            </div>
-          </div>
-          <div class="text-3xl font-bold text-foreground">{{ formatCurrency(stats.total_value) }}</div>
-          <div class="text-muted-foreground text-sm mt-1">Em contratos ativos</div>
-        </CardContent>
-      </Card>
-
-      <Card class="border-border">
-        <CardContent class="p-6">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Pendentes</span>
-            <div class="w-8 h-8 bg-warning/10 text-warning rounded-lg flex items-center justify-center">
-              ⏳
-            </div>
-          </div>
-          <div class="text-3xl font-bold text-foreground">{{ String(stats.total_pending).padStart(2, '0') }}</div>
-          <div class="text-warning text-sm mt-1">Aguardando assinatura</div>
-        </CardContent>
-      </Card>
-
-      <Card class="border-border">
-        <CardContent class="p-6">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Expira em 30d</span>
-            <div class="w-8 h-8 bg-destructive/10 text-destructive rounded-lg flex items-center justify-center">
-              ⚠
-            </div>
-          </div>
-          <div class="text-3xl font-bold text-foreground">{{ String(stats.expiring_soon).padStart(2, '0') }}</div>
-          <div class="text-destructive text-sm mt-1 font-medium">Requer atenção</div>
-        </CardContent>
-      </Card>
-    </div>
-
-    <!-- Filters -->
-    <Card class="mb-6 border-border">
-      <CardContent class="p-4">
-        <div class="flex flex-wrap items-center justify-between gap-4">
-          <div class="flex flex-wrap items-center gap-4">
-            <div class="flex items-center gap-2 bg-muted px-3 py-2 rounded-lg border border-border">
-              <span class="text-sm text-muted-foreground">Status:</span>
-              <select
-                v-model="filters.status"
-                class="bg-transparent border-none text-sm focus:ring-0 cursor-pointer text-foreground"
-                @change="applyFilters"
-              >
-                <option value="">Todos</option>
-                <option value="active">Ativo</option>
-                <option value="pending">Pendente</option>
-                <option value="expired">Expirado</option>
-                <option value="draft">Rascunho</option>
-              </select>
-            </div>
-
-            <div class="relative">
-              <Input
-                v-model="filters.search"
-                placeholder="Buscar contratos..."
-                class="pl-10 w-64"
-                @keyup.enter="applyFilters"
-              />
-              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">🔍</span>
-            </div>
-          </div>
-
-          <button
-            class="text-primary text-sm hover:underline"
-            @click="clearFilters"
-          >
-            Limpar Filtros
+        <!-- Quick Filters -->
+        <div class="flex items-center gap-sm">
+          <button class="flex items-center gap-xs px-md py-sm border border-outline-variant rounded-lg hover:bg-surface-container-high transition-colors font-label-md text-label-md text-on-surface-variant">
+            <span class="material-symbols-outlined text-[18px]">filter_list</span>
+            Status
+          </button>
+          <button class="flex items-center gap-xs px-md py-sm border border-outline-variant rounded-lg hover:bg-surface-container-high transition-colors font-label-md text-label-md text-on-surface-variant">
+            <span class="material-symbols-outlined text-[18px]">calendar_today</span>
+            Vigência
           </button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
 
-    <!-- Error Alert -->
-    <Alert v-if="error" variant="destructive" class="mb-6">
-      <AlertDescription>{{ error }}</AlertDescription>
-    </Alert>
+      <!-- Primary CTA -->
+      <button class="bg-primary text-on-primary px-lg py-md rounded-lg font-label-md text-label-md flex items-center gap-sm hover:opacity-90 active:scale-[0.98] transition-all shadow-sm">
+        <span class="material-symbols-outlined text-[20px]">add</span>
+        Novo Contrato
+      </button>
+    </section>
 
-    <!-- Table -->
-    <Card class="border-border">
-      <div class="overflow-x-auto">
-        <table class="w-full">
-          <thead>
-            <tr class="bg-muted border-b border-border">
-              <th class="px-6 py-4 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Nome / ID</th>
-              <th class="px-6 py-4 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Projeto Vinculado</th>
-              <th class="px-6 py-4 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Cliente</th>
-              <th class="px-6 py-4 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Vigência</th>
-              <th class="px-6 py-4 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Valor Total</th>
-              <th class="px-6 py-4 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
-              <th class="px-6 py-4 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">Ações</th>
+    <!-- Content Canvas -->
+    <section class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden shadow-sm flex flex-col">
+      <div class="p-lg border-b border-outline-variant flex justify-between items-center bg-surface-bright">
+        <h3 class="font-h3 text-h3 text-on-surface">Contratos</h3>
+        <button class="text-primary font-label-sm text-label-sm hover:underline">Exportar</button>
+      </div>
+
+      <div class="flex-1 p-0">
+        <table class="w-full text-left">
+          <thead class="bg-surface-container-low">
+            <tr>
+              <th class="px-lg py-md font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Contrato</th>
+              <th class="px-lg py-md font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Cliente</th>
+              <th class="px-lg py-md font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Status</th>
+              <th class="px-lg py-md font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Vigência</th>
+              <th class="px-lg py-md font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Valor</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-border">
-            <tr v-if="isLoading">
-              <td colspan="7" class="px-6 py-12 text-center text-muted-foreground">
-                Carregando...
+          <tbody class="divide-y divide-outline-variant">
+            <tr class="table-row-hover group">
+              <td class="px-lg py-md">
+                <div class="flex items-center gap-md">
+                  <div class="w-8 h-8 bg-secondary-container text-primary rounded flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[18px]">description</span>
+                  </div>
+                  <span class="font-body-lg text-body-lg text-on-surface">Contrato SaaS 2024</span>
+                </div>
               </td>
+              <td class="px-lg py-md font-body-sm text-body-sm text-on-surface-variant">Empresa Alpha</td>
+              <td class="px-lg py-md">
+                <span class="px-sm py-xs bg-green-100 text-green-700 rounded-full font-label-sm text-[11px] uppercase font-bold">Ativo</span>
+              </td>
+              <td class="px-lg py-md font-body-sm text-body-sm text-on-surface-variant">12 meses</td>
+              <td class="px-lg py-md font-body-sm text-body-sm text-on-surface-variant">R$ 120.000</td>
             </tr>
-            <tr v-else-if="contracts.length === 0">
-              <td colspan="7" class="px-6 py-12 text-center text-muted-foreground">
-                Nenhum contrato encontrado.
+
+            <tr class="table-row-hover group">
+              <td class="px-lg py-md">
+                <div class="flex items-center gap-md">
+                  <div class="w-8 h-8 bg-tertiary-fixed text-tertiary rounded flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[18px]">description</span>
+                  </div>
+                  <span class="font-body-lg text-body-lg text-on-surface">Contrato Consultoria</span>
+                </div>
               </td>
+              <td class="px-lg py-md font-body-sm text-body-sm text-on-surface-variant">Cliente Beta</td>
+              <td class="px-lg py-md">
+                <span class="px-sm py-xs bg-surface-container-high border border-outline-variant text-outline text-[11px] uppercase font-bold">Pendente</span>
+              </td>
+              <td class="px-lg py-md font-body-sm text-body-sm text-on-surface-variant">6 meses</td>
+              <td class="px-lg py-md font-body-sm text-body-sm text-on-surface-variant">R$ 45.000</td>
             </tr>
-            <tr
-              v-for="contract in contracts"
-              :key="contract.id"
-              class="hover:bg-muted/50 transition-colors group"
-            >
-              <td class="px-6 py-4">
-                <div class="flex flex-col">
-                  <span class="font-semibold text-foreground">{{ contract.code }}</span>
-                  <span class="text-sm text-muted-foreground">{{ contract.name }}</span>
+
+            <tr class="table-row-hover group">
+              <td class="px-lg py-md">
+                <div class="flex items-center gap-md">
+                  <div class="w-8 h-8 bg-primary-fixed text-primary rounded flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[18px]">description</span>
+                  </div>
+                  <span class="font-body-lg text-body-lg text-on-surface">Contrato Suporte</span>
                 </div>
               </td>
-              <td class="px-6 py-4">
-                <div v-if="contract.projects && contract.projects.length > 0" class="flex items-center gap-2">
-                  <span class="text-muted-foreground">📁</span>
-                  <span class="text-sm text-foreground">{{ contract.projects[0]?.name }}</span>
-                  <span v-if="contract.projects.length > 1" class="text-xs text-muted-foreground">
-                    +{{ contract.projects.length - 1 }}
-                  </span>
-                </div>
-                <span v-else class="text-sm text-muted-foreground">—</span>
+              <td class="px-lg py-md font-body-sm text-body-sm text-on-surface-variant">Organização Gamma</td>
+              <td class="px-lg py-md">
+                <span class="px-sm py-xs bg-green-100 text-green-700 rounded-full font-label-sm text-[11px] uppercase font-bold">Ativo</span>
               </td>
-              <td class="px-6 py-4 text-sm text-foreground">
-                {{ contract.client_name }}
-              </td>
-              <td class="px-6 py-4">
-                <div class="flex flex-col">
-                  <span class="text-sm text-foreground">{{ formatDate(contract.start_date) }}</span>
-                  <span class="text-xs text-muted-foreground">até {{ formatDate(contract.end_date) }}</span>
-                </div>
-              </td>
-              <td class="px-6 py-4 font-medium text-foreground">
-                {{ formatCurrency(Number(contract.value)) }}
-              </td>
-              <td class="px-6 py-4 text-center">
-                <span
-                  class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                  :class="getStatusBadgeClass(contract.status)"
-                >
-                  {{ getStatusLabel(contract.status) }}
-                </span>
-              </td>
-              <td class="px-6 py-4 text-right">
-                <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    class="p-2 hover:bg-muted rounded-lg text-muted-foreground transition-colors"
-                    title="Ver Detalhes"
-                  >
-                    👁
-                  </button>
-                  <button
-                    class="p-2 hover:bg-muted rounded-lg text-muted-foreground transition-colors"
-                    title="Editar"
-                  >
-                    ✏️
-                  </button>
-                  <button
-                    class="p-2 hover:bg-muted rounded-lg text-muted-foreground transition-colors"
-                    title="Excluir"
-                  >
-                    🗑️
-                  </button>
-                </div>
-              </td>
+              <td class="px-lg py-md font-body-sm text-body-sm text-on-surface-variant">24 meses</td>
+              <td class="px-lg py-md font-body-sm text-body-sm text-on-surface-variant">R$ 240.000</td>
             </tr>
           </tbody>
         </table>
       </div>
-
-      <!-- Pagination -->
-      <div class="px-6 py-4 border-t border-border bg-muted flex items-center justify-between">
-        <span class="text-sm text-muted-foreground">
-          Mostrando {{ (pagination.current_page - 1) * pagination.per_page + 1 }}-{{ Math.min(pagination.current_page * pagination.per_page, pagination.total) }} de {{ pagination.total }} contratos
-        </span>
-        <div class="flex items-center gap-2">
-          <button
-            class="p-1 border border-border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-accent"
-            :disabled="pagination.current_page === 1"
-            @click="goToPage(pagination.current_page - 1)"
-          >
-            ←
-          </button>
-          <template v-for="page in paginationPages" :key="page">
-            <span v-if="page === '...'" class="text-muted-foreground">...</span>
-            <button
-              v-else
-              class="w-8 h-8 flex items-center justify-center rounded-lg text-sm"
-              :class="page === pagination.current_page ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'"
-              @click="goToPage(page as number)"
-            >
-              {{ page }}
-            </button>
-          </template>
-          <button
-            class="p-1 border border-border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-accent"
-            :disabled="pagination.current_page === pagination.last_page"
-            @click="goToPage(pagination.current_page + 1)"
-          >
-            →
-          </button>
-        </div>
-      </div>
-    </Card>
+    </section>
   </div>
 </template>

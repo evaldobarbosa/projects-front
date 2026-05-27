@@ -1,20 +1,20 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
-import { api, type Project, type ProjectStats, type ProjectFilters } from '@/lib/api'
+import { useRouter, useRoute } from 'vue-router'
+import { api, type Questionnaire, type QuestionnaireStats, type QuestionnaireFilters } from '@/lib/api'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
 const router = useRouter()
+const route = useRoute()
 
-const projects = ref<Project[]>([])
-const stats = ref<ProjectStats>({
+const questionnaires = ref<Questionnaire[]>([])
+const stats = ref<QuestionnaireStats>({
   total: 0,
   draft: 0,
-  in_field: 0,
-  finished: 0,
+  published: 0,
   archived: 0,
 })
 const pagination = ref({
@@ -26,36 +26,37 @@ const pagination = ref({
 const isLoading = ref(false)
 const error = ref<string | null>(null)
 
-const filters = ref<ProjectFilters>({
+const filters = ref<QuestionnaireFilters>({
   search: '',
   status: '',
   page: 1,
+  project_id: route.query.project_id ? Number(route.query.project_id) : undefined,
 })
 
-async function loadProjects() {
+async function loadQuestionnaires() {
   isLoading.value = true
   error.value = null
 
   try {
-    const response = await api.getProjects(filters.value)
-    projects.value = response.projects.data
+    const response = await api.getQuestionnaires(filters.value)
+    questionnaires.value = response.questionnaires.data
     stats.value = response.stats
     pagination.value = {
-      current_page: response.projects.current_page,
-      last_page: response.projects.last_page,
-      per_page: response.projects.per_page,
-      total: response.projects.total,
+      current_page: response.questionnaires.current_page,
+      last_page: response.questionnaires.last_page,
+      per_page: response.questionnaires.per_page,
+      total: response.questionnaires.total,
     }
   } catch (err) {
-    error.value = 'Erro ao carregar projetos.'
+    error.value = 'Erro ao carregar questionarios.'
     console.error(err)
   } finally {
     isLoading.value = false
   }
 }
 
-function formatDate(dateStr: string | undefined): string {
-  if (!dateStr) return '—'
+function formatDate(dateStr: string | undefined | null): string {
+  if (!dateStr) return '-'
   const date = new Date(dateStr)
   return date.toLocaleDateString('pt-BR', {
     day: '2-digit',
@@ -67,8 +68,7 @@ function formatDate(dateStr: string | undefined): string {
 function getStatusBadgeClass(status: string): string {
   const classes: Record<string, string> = {
     draft: 'bg-muted text-muted-foreground',
-    in_field: 'bg-primary/10 text-primary',
-    finished: 'bg-success/10 text-success',
+    published: 'bg-success/10 text-success',
     archived: 'bg-secondary text-secondary-foreground',
   }
   return classes[status] || 'bg-muted text-muted-foreground'
@@ -77,8 +77,7 @@ function getStatusBadgeClass(status: string): string {
 function getStatusLabel(status: string): string {
   const labels: Record<string, string> = {
     draft: 'Rascunho',
-    in_field: 'Em Campo',
-    finished: 'Concluído',
+    published: 'Publicado',
     archived: 'Arquivado',
   }
   return labels[status] || status
@@ -86,7 +85,7 @@ function getStatusLabel(status: string): string {
 
 function applyFilters() {
   filters.value.page = 1
-  loadProjects()
+  loadQuestionnaires()
 }
 
 function clearFilters() {
@@ -94,31 +93,36 @@ function clearFilters() {
     search: '',
     status: '',
     page: 1,
+    project_id: filters.value.project_id,
   }
-  loadProjects()
+  loadQuestionnaires()
 }
 
 function goToPage(page: number) {
   if (page >= 1 && page <= pagination.value.last_page) {
     filters.value.page = page
-    loadProjects()
+    loadQuestionnaires()
   }
 }
 
-function viewProject(project: Project) {
-  router.push(`/projects/${project.id}`)
+function viewQuestionnaire(questionnaire: Questionnaire) {
+  router.push(`/questionnaires/${questionnaire.id}`)
 }
 
-async function deleteProject(project: Project) {
-  if (!confirm(`Tem certeza que deseja excluir o projeto "${project.name}"?`)) {
+function openBuilder(questionnaire: Questionnaire) {
+  router.push(`/questionnaires/${questionnaire.id}/builder`)
+}
+
+async function deleteQuestionnaire(questionnaire: Questionnaire) {
+  if (!confirm(`Tem certeza que deseja excluir o questionario "${questionnaire.title}"?`)) {
     return
   }
 
   try {
-    await api.deleteProject(project.id)
-    loadProjects()
+    await api.deleteQuestionnaire(questionnaire.id)
+    loadQuestionnaires()
   } catch (err) {
-    error.value = 'Erro ao excluir projeto.'
+    error.value = 'Erro ao excluir questionario.'
     console.error(err)
   }
 }
@@ -144,38 +148,34 @@ const paginationPages = computed(() => {
 })
 
 onMounted(() => {
-  loadProjects()
+  loadQuestionnaires()
 })
 </script>
 
 <template>
   <div>
     <!-- Actions Bar -->
-    <div class="flex justify-end gap-2 mb-6">
-      <Button variant="outline" size="sm">
-        <span class="material-symbols-outlined text-[16px] mr-1.5">download</span>
-        Exportar
-      </Button>
-      <RouterLink to="/projects/new">
+    <div class="flex justify-end mb-6">
+      <RouterLink to="/questionnaires/new">
         <Button size="sm">
           <span class="material-symbols-outlined text-[16px] mr-1.5">add</span>
-          Novo Projeto
+          Novo Questionário
         </Button>
       </RouterLink>
     </div>
 
     <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
       <Card class="border-border">
         <CardContent class="p-6">
           <div class="flex items-center justify-between mb-2">
             <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total</span>
             <div class="w-8 h-8 bg-secondary text-secondary-foreground rounded-lg flex items-center justify-center">
-              <span class="material-symbols-outlined text-[20px]">folder</span>
+              <span class="material-symbols-outlined text-[20px]">assignment</span>
             </div>
           </div>
           <div class="text-3xl font-bold text-foreground">{{ stats.total }}</div>
-          <div class="text-muted-foreground text-sm mt-1">projetos</div>
+          <div class="text-muted-foreground text-sm mt-1">questionarios</div>
         </CardContent>
       </Card>
 
@@ -188,33 +188,20 @@ onMounted(() => {
             </div>
           </div>
           <div class="text-3xl font-bold text-foreground">{{ stats.draft }}</div>
-          <div class="text-muted-foreground text-sm mt-1">em elaboração</div>
+          <div class="text-muted-foreground text-sm mt-1">em elaboracao</div>
         </CardContent>
       </Card>
 
       <Card class="border-border">
         <CardContent class="p-6">
           <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Em Campo</span>
-            <div class="w-8 h-8 bg-primary/10 text-primary rounded-lg flex items-center justify-center">
-              <span class="material-symbols-outlined text-[20px]">play_circle</span>
-            </div>
-          </div>
-          <div class="text-3xl font-bold text-foreground">{{ stats.in_field }}</div>
-          <div class="text-muted-foreground text-sm mt-1">coletando dados</div>
-        </CardContent>
-      </Card>
-
-      <Card class="border-border">
-        <CardContent class="p-6">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Concluídos</span>
+            <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Publicados</span>
             <div class="w-8 h-8 bg-success/10 text-success rounded-lg flex items-center justify-center">
               <span class="material-symbols-outlined text-[20px]">check_circle</span>
             </div>
           </div>
-          <div class="text-3xl font-bold text-foreground">{{ stats.finished }}</div>
-          <div class="text-muted-foreground text-sm mt-1">finalizados</div>
+          <div class="text-3xl font-bold text-foreground">{{ stats.published }}</div>
+          <div class="text-muted-foreground text-sm mt-1">em producao</div>
         </CardContent>
       </Card>
 
@@ -246,8 +233,7 @@ onMounted(() => {
               >
                 <option value="">Todos</option>
                 <option value="draft">Rascunho</option>
-                <option value="in_field">Em Campo</option>
-                <option value="finished">Concluído</option>
+                <option value="published">Publicado</option>
                 <option value="archived">Arquivado</option>
               </select>
             </div>
@@ -255,7 +241,7 @@ onMounted(() => {
             <div class="relative">
               <Input
                 v-model="filters.search"
-                placeholder="Buscar projetos..."
+                placeholder="Buscar questionarios..."
                 class="pl-10 w-64"
                 @keyup.enter="applyFilters"
               />
@@ -286,12 +272,12 @@ onMounted(() => {
         <table class="w-full">
           <thead>
             <tr class="bg-muted border-b border-border">
+              <th class="px-6 py-4 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Questionario</th>
               <th class="px-6 py-4 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Projeto</th>
-              <th class="px-6 py-4 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Responsável</th>
-              <th class="px-6 py-4 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Período</th>
-              <th class="px-6 py-4 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Contratos</th>
+              <th class="px-6 py-4 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Versao</th>
+              <th class="px-6 py-4 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Atualizado</th>
               <th class="px-6 py-4 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
-              <th class="px-6 py-4 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">Ações</th>
+              <th class="px-6 py-4 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">Acoes</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-border">
@@ -300,83 +286,77 @@ onMounted(() => {
                 Carregando...
               </td>
             </tr>
-            <tr v-else-if="projects.length === 0">
+            <tr v-else-if="questionnaires.length === 0">
               <td colspan="6" class="px-6 py-12 text-center">
                 <div class="flex flex-col items-center">
                   <div class="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
-                    <span class="material-symbols-outlined text-[32px] text-muted-foreground">folder_off</span>
+                    <span class="material-symbols-outlined text-[32px] text-muted-foreground">assignment</span>
                   </div>
-                  <h3 class="text-lg font-semibold text-foreground mb-2">Nenhum projeto encontrado</h3>
-                  <p class="text-muted-foreground mb-4">Crie seu primeiro projeto de pesquisa para começar.</p>
-                  <RouterLink to="/projects/new">
+                  <h3 class="text-lg font-semibold text-foreground mb-2">Nenhum questionario encontrado</h3>
+                  <p class="text-muted-foreground mb-4">Crie seu primeiro questionario para comecar.</p>
+                  <RouterLink to="/questionnaires/new">
                     <Button>
                       <span class="material-symbols-outlined text-[18px] mr-2">add</span>
-                      Criar Projeto
+                      Criar Questionario
                     </Button>
                   </RouterLink>
                 </div>
               </td>
             </tr>
             <tr
-              v-for="project in projects"
-              :key="project.id"
+              v-for="questionnaire in questionnaires"
+              :key="questionnaire.id"
               class="hover:bg-muted/50 transition-colors group cursor-pointer"
-              @click="viewProject(project)"
+              @click="viewQuestionnaire(questionnaire)"
             >
               <td class="px-6 py-4">
                 <div class="flex flex-col">
-                  <span class="font-semibold text-foreground">{{ project.name }}</span>
-                  <span class="text-sm text-muted-foreground line-clamp-1">{{ project.description || '—' }}</span>
+                  <span class="font-semibold text-foreground">{{ questionnaire.title }}</span>
+                  <span class="text-sm text-muted-foreground line-clamp-1">{{ questionnaire.description || '-' }}</span>
                 </div>
               </td>
               <td class="px-6 py-4 text-sm text-foreground">
-                {{ project.owner?.name || '—' }}
+                {{ questionnaire.project?.name || '-' }}
               </td>
               <td class="px-6 py-4">
-                <div class="flex flex-col">
-                  <span class="text-sm text-foreground">{{ formatDate(project.start_date) }}</span>
-                  <span class="text-xs text-muted-foreground">até {{ formatDate(project.end_date) }}</span>
-                </div>
-              </td>
-              <td class="px-6 py-4">
-                <div v-if="project.contracts && project.contracts.length > 0" class="flex items-center gap-2">
-                  <span class="material-symbols-outlined text-muted-foreground text-[18px]">contract</span>
-                  <span class="text-sm text-foreground">{{ project.contracts[0]?.name }}</span>
-                  <span v-if="project.contracts.length > 1" class="text-xs text-muted-foreground">
-                    +{{ project.contracts.length - 1 }}
+                <div class="flex items-center gap-2">
+                  <span class="text-sm text-foreground">v{{ questionnaire.active_version?.version_number || 1 }}</span>
+                  <span v-if="questionnaire.versions_count && questionnaire.versions_count > 1" class="text-xs text-muted-foreground">
+                    ({{ questionnaire.versions_count }} versoes)
                   </span>
                 </div>
-                <span v-else class="text-sm text-muted-foreground">—</span>
+              </td>
+              <td class="px-6 py-4 text-sm text-muted-foreground">
+                {{ formatDate(questionnaire.updated_at) }}
               </td>
               <td class="px-6 py-4 text-center">
                 <span
                   class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                  :class="getStatusBadgeClass(project.status)"
+                  :class="getStatusBadgeClass(questionnaire.status)"
                 >
-                  {{ getStatusLabel(project.status) }}
+                  {{ getStatusLabel(questionnaire.status) }}
                 </span>
               </td>
               <td class="px-6 py-4 text-right" @click.stop>
                 <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
+                    class="p-2 hover:bg-primary/10 rounded-lg text-muted-foreground hover:text-primary transition-colors"
+                    title="Abrir Builder"
+                    @click="openBuilder(questionnaire)"
+                  >
+                    <span class="material-symbols-outlined text-[18px]">edit_square</span>
+                  </button>
+                  <button
                     class="p-2 hover:bg-muted rounded-lg text-muted-foreground transition-colors"
                     title="Ver Detalhes"
-                    @click="viewProject(project)"
+                    @click="viewQuestionnaire(questionnaire)"
                   >
                     <span class="material-symbols-outlined text-[18px]">visibility</span>
                   </button>
-                  <RouterLink :to="`/projects/${project.id}/edit`">
-                    <button
-                      class="p-2 hover:bg-muted rounded-lg text-muted-foreground transition-colors"
-                      title="Editar"
-                    >
-                      <span class="material-symbols-outlined text-[18px]">edit</span>
-                    </button>
-                  </RouterLink>
                   <button
                     class="p-2 hover:bg-destructive/10 rounded-lg text-muted-foreground hover:text-destructive transition-colors"
                     title="Excluir"
-                    @click="deleteProject(project)"
+                    @click="deleteQuestionnaire(questionnaire)"
                   >
                     <span class="material-symbols-outlined text-[18px]">delete</span>
                   </button>
@@ -388,9 +368,9 @@ onMounted(() => {
       </div>
 
       <!-- Pagination -->
-      <div v-if="projects.length > 0" class="px-6 py-4 border-t border-border bg-muted flex items-center justify-between">
+      <div v-if="questionnaires.length > 0" class="px-6 py-4 border-t border-border bg-muted flex items-center justify-between">
         <span class="text-sm text-muted-foreground">
-          Mostrando {{ (pagination.current_page - 1) * pagination.per_page + 1 }}-{{ Math.min(pagination.current_page * pagination.per_page, pagination.total) }} de {{ pagination.total }} projetos
+          Mostrando {{ (pagination.current_page - 1) * pagination.per_page + 1 }}-{{ Math.min(pagination.current_page * pagination.per_page, pagination.total) }} de {{ pagination.total }} questionarios
         </span>
         <div class="flex items-center gap-2">
           <button

@@ -65,24 +65,36 @@ async function loadContracts() {
 }
 
 async function handleSubmit() {
+  console.log('[ProjectFormView] handleSubmit chamado')
+  console.log('[ProjectFormView] Dados do formulário:', form.value)
   isSaving.value = true
   error.value = null
   validationErrors.value = {}
 
   try {
-    if (isEditing.value) {
-      await api.updateProject(projectId.value, form.value)
-    } else {
-      await api.createProject(form.value)
-    }
+    const action = isEditing.value ? 'Editando' : 'Criando'
+    console.log(`[ProjectFormView] ${action} projeto`)
 
-    router.push('/projects')
+    const saveProject = isEditing.value
+      ? async () => {
+          await api.updateProject(projectId.value, form.value)
+          return projectId.value
+        }
+      : async () => {
+          const response = await api.createProject(form.value)
+          console.log('[ProjectFormView] Projeto criado:', response)
+          return response.project.id
+        }
+
+    const id = await saveProject()
+    console.log('[ProjectFormView] Redirecionando para /projects/' + id)
+    router.push(`/projects/${id}`)
   } catch (err: any) {
+    console.error('[ProjectFormView] Erro ao salvar projeto:', err)
     if (err.errors) {
       validationErrors.value = err.errors
     }
     error.value = err.message || 'Erro ao salvar projeto.'
-    console.error(err)
   } finally {
     isSaving.value = false
   }
@@ -111,22 +123,14 @@ onMounted(() => {
 
 <template>
   <div>
-    <!-- Header -->
-    <div class="flex items-center gap-4 mb-8">
+    <!-- Back Button -->
+    <div class="mb-6">
       <button
-        class="p-2 hover:bg-muted rounded-lg text-muted-foreground transition-colors"
+        class="p-1.5 hover:bg-muted rounded-lg text-muted-foreground transition-colors"
         @click="router.push('/projects')"
       >
-        <span class="material-symbols-outlined">arrow_back</span>
+        <span class="material-symbols-outlined text-[20px]">arrow_back</span>
       </button>
-      <div>
-        <h1 class="text-3xl font-bold text-foreground">
-          {{ isEditing ? 'Editar Projeto' : 'Novo Projeto' }}
-        </h1>
-        <p class="mt-1 text-muted-foreground">
-          {{ isEditing ? 'Atualize as informações do projeto' : 'Preencha as informações para criar um novo projeto' }}
-        </p>
-      </div>
     </div>
 
     <!-- Loading State -->

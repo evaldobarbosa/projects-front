@@ -43,17 +43,34 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function fetchUser(): Promise<void> {
-    if (!api.hasToken()) {
+    console.log('[Auth] fetchUser chamado')
+    console.log('[Auth] Mock mode?', import.meta.env.VITE_USE_MOCK_API)
+    console.log('[Auth] Tem token?', api.hasToken())
+
+    // Auto-login in mock mode for development
+    if (import.meta.env.VITE_USE_MOCK_API === 'true' && !api.hasToken()) {
+      console.log('[Auth] Modo mock ativo sem token, fazendo auto-login...')
+      await login('dev@formassistant.com', 'password')
+      console.log('[Auth] Auto-login completo, user:', user.value)
       isInitialized.value = true
       return
     }
 
+    if (!api.hasToken()) {
+      console.log('[Auth] Sem token, marcando como inicializado')
+      isInitialized.value = true
+      return
+    }
+
+    console.log('[Auth] Tem token, buscando usuário...')
     isLoading.value = true
 
     try {
       const response = await api.me()
       user.value = response.user
-    } catch {
+      console.log('[Auth] Usuário carregado:', user.value)
+    } catch (err) {
+      console.log('[Auth] Erro ao buscar usuário:', err)
       api.clearToken()
       user.value = null
     } finally {

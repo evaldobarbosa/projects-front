@@ -1,0 +1,6 @@
+export { default as FormBuilder } from './FormBuilder.vue'
+export { default as ComponentPalette } from './ComponentPalette.vue'
+export { default as FormCanvas } from './FormCanvas.vue'
+export { default as PropertiesPanel } from './PropertiesPanel.vue'
+export { default as SectionBlock } from './SectionBlock.vue'
+export { default as ComponentBlock } from './ComponentBlock.vue'
